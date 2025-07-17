@@ -1,170 +1,71 @@
+LustFetchBot – Ultimate NSFW Telegram Bot with Multi-API, Premium, Admin Unlock, and Enhanced UX
 
-import random
-import requests
-from telegram import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    Update,
-)
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    CallbackQueryHandler,
-    MessageHandler,
-    filters,
-    ContextTypes
-)
+Built in Python (Aiogram) – Production-Ready Version
 
-TOKEN = "8044715557:AAGdxBxX1--A5efKqTsRSB7larhMD8efALk"
+from aiogram import Bot, Dispatcher, types, executor import requests from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton import logging
 
-user_query = {}
-user_images = {}
-user_history = {}
-user_favorites = {}
+API_TOKEN = '8044715557:AAGdxBxX1--A5efKqTsRSB7larhMD8efALk' ADMINS = [123456789]  # Replace with real admin user IDs ADMIN_UNLOCK_CODE = "UNLOCKGODS666"
 
-MAIN_MENU = InlineKeyboardMarkup([
-    [InlineKeyboardButton("🔍 Search Top NSFW", callback_data="search")],
-    [InlineKeyboardButton("🎲 Random NSFW", callback_data="random")],
-    [InlineKeyboardButton("⭐ My Favorites", callback_data="favorites")],
-    [InlineKeyboardButton("🕓 History", callback_data="history")],
-    [InlineKeyboardButton("ℹ️ About", callback_data="about")]
-])
+bot = Bot(token=API_TOKEN) dp = Dispatcher(bot) logging.basicConfig(level=logging.INFO)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
-        "💎 Welcome to the Ultimate NSFW Bot!\nOnly the best-rated Rule34 content.\n\nChoose an option below:",
-        "Only the best-rated Rule34 content."
+--- UTILITIES ---
 
-        "Choose an option below:",
-        reply_markup=MAIN_MENU
-    )
+def fetch_from_danbooru(tags, limit=3): url = f"https://danbooru.donmai.us/posts.json?tags={tags}+rating:explicit&limit={limit}" r = requests.get(url) if r.ok: return [post['file_url'] for post in r.json() if 'file_url' in post] return []
 
-async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
+def fetch_from_gelbooru(tags, limit=3): url = f"https://gelbooru.com/index.php?page=dapi&s=post&q=index&json=1&limit={limit}&tags={tags}" r = requests.get(url) if r.ok: return [post['file_url'] for post in r.json() if 'file_url' in post] return []
 
-    if query.data == "search":
-        await query.edit_message_text("✏️ Send me the character name to fetch top-rated NSFW images.")
-    elif query.data == "random":
-        await send_random_image(query.message.chat.id, context, user_id)
-    elif query.data == "favorites":
-        favs = user_favorites.get(user_id, [])
-        if not favs:
-            await query.edit_message_text("⭐ You have no favorites yet.")
-        else:
-            for img in favs[:5]:
-                await context.bot.send_photo(chat_id=query.message.chat.id, photo=img)
-    elif query.data == "history":
-        hist = user_history.get(user_id, [])
-        if not hist:
-            await query.edit_message_text("🕓 No search history found.")
-        else:
-await query.edit_message_text(f"🧠 Your recent searches:"
-- " + "\n- ".join(hist[-5:]))"
-    elif query.data == "about":
-        await query.edit_message_text(
-"🤖 This bot fetches only high-rated NSFW anime images using Rule34."
-""
-"Features: Favorites, History, Random and Smart Search."
+def fetch_from_rule34(tags, limit=3): url = f"https://api.rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&limit={limit}&tags={tags}" r = requests.get(url) if r.ok: return [post['file_url'] for post in r.json() if 'file_url' in post] return []
 
-""
-            "Use /start to return to the menu."
-        )
+def fetch_images(tags, limit=3): results = fetch_from_danbooru(tags, limit) if not results: results = fetch_from_gelbooru(tags, limit) if not results: results = fetch_from_rule34(tags, limit) return results
 
-async def receive_character(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    term = update.message.text.strip()
+--- USER DATABASE MOCK ---
 
-    images = fetch_top_images(term)
-    if not images:
-        await update.message.reply_text("❌ No high-rated images found. Try a different name.")
-        return
+premium_users = set() admin_unlocked_users = set() user_preferences = {}  # Stores saved waifus
 
-    user_query[user_id] = term
-    user_images[user_id] = images
-    user_history.setdefault(user_id, []).append(term)
+--- START ---
 
-    keyboard = [
-        [InlineKeyboardButton("➡️ Next", callback_data="next")],
-        [InlineKeyboardButton("⭐ Favorite", callback_data="fav")],
-        [InlineKeyboardButton("⬅️ Menu", callback_data="menu")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+@dp.message_handler(commands=['start']) async def start_cmd(message: types.Message): keyboard = InlineKeyboardMarkup(row_width=2) keyboard.add( InlineKeyboardButton("Search Character 🔍", switch_inline_query_current_chat=""), InlineKeyboardButton("Random Tag 🎲", callback_data="random_menu"), InlineKeyboardButton("Become Premium 💎", callback_data="premium") ) if message.from_user.id in ADMINS: keyboard.add(InlineKeyboardButton("🔐 Admin Unlock", callback_data="admin_unlock"))
 
-    await update.message.reply_photo(
-        photo=images[0],
-        caption=f"🔞 Top-rated results for: {term}",
-        reply_markup=reply_markup
-    )
+await message.answer(
+    "Welcome to *LustFetchBot* – your AI-powered NSFW image bot.\n\nUse the menu below or type `/character [name]` or `/random [tag]`.",
+    reply_markup=keyboard, parse_mode="Markdown")
 
-async def next_image(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    term = user_query.get(user_id, "")
-    images = user_images.get(user_id, [])
+--- CHARACTER SEARCH ---
 
-    if not images:
-        await query.message.reply_text("⚠️ No search loaded. Send a character name first.")
-        return
+@dp.message_handler(commands=['character']) async def character_cmd(message: types.Message): user_id = message.from_user.id if len(message.text.split()) < 2: await message.reply("Usage: /character [name]") return name = '_'.join(message.text.split()[1:]) await message.reply(f"Searching for {name}...", parse_mode="Markdown")
 
-    image = random.choice(images)
-    keyboard = [
-        [InlineKeyboardButton("➡️ Next", callback_data="next")],
-        [InlineKeyboardButton("⭐ Favorite", callback_data="fav")],
-        [InlineKeyboardButton("⬅️ Menu", callback_data="menu")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+limit = 5 if user_id in premium_users or user_id in admin_unlocked_users else 2
+images = fetch_images(name, limit=limit)
+if not images:
+    await message.reply("No results found. Try a different character or spelling.")
+    return
 
-    await context.bot.send_photo(chat_id=query.message.chat.id, photo=image, caption=f"🔞 {term}", reply_markup=reply_markup)
+for img in images:
+    await bot.send_photo(chat_id=message.chat.id, photo=img)
 
-async def add_favorite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    last_images = user_images.get(user_id, [])
+--- PREMIUM BUTTON ---
 
-    if last_images:
-        img = last_images[0]
-        user_favorites.setdefault(user_id, [])
-        if img not in user_favorites[user_id]:
-            user_favorites[user_id].append(img)
-            await query.message.reply_text("⭐ Image added to favorites.")
-        else:
-            await query.message.reply_text("⚠️ Image already in favorites.")
+@dp.callback_query_handler(lambda c: c.data == "premium") async def premium_callback(callback_query: types.CallbackQuery): await bot.answer_callback_query(callback_query.id) await bot.send_message(callback_query.from_user.id, "💎 Premium Includes:\n- Unlimited searches\n- 5+ results per fetch\n- HD-only toggle\n- Daily waifu drop\n\nUpgrade now: https://yourpaymentlink.com", parse_mode="Markdown")
 
-async def send_random_image(chat_id, context, user_id):
-    random_tags = ["asuna", "mikasa", "yor_forger", "zero_two", "tsunade"]
-    term = random.choice(random_tags)
-    images = fetch_top_images(term)
+--- ADMIN UNLOCK ---
 
-    if images:
-        user_query[user_id] = term
-        user_images[user_id] = images
-        image = random.choice(images)
-        await context.bot.send_photo(chat_id=chat_id, photo=image, caption=f"🎲 Random top-rated: {term}")
-    else:
-        await context.bot.send_message(chat_id=chat_id, text="❌ No good images found.")
+@dp.callback_query_handler(lambda c: c.data == "admin_unlock") async def admin_unlock_button(callback_query: types.CallbackQuery): await bot.answer_callback_query(callback_query.id) await bot.send_message(callback_query.from_user.id, "Send the secret admin unlock code:")
 
-def fetch_top_images(term):
-    tag = f"{term.replace(' ', '_')} rating:explicit score:>50"
-    url = f"https://api.rule34.xxx/index.php?page=dapi&s=post&q=index&json=1&limit=30&tags={tag}"
-    try:
-        response = requests.get(url, timeout=10)
-        data = response.json()
-        return [item["file_url"] for item in data if item.get("file_url", "").endswith((".jpg", ".png", ".jpeg", ".webp"))]
-    except:
-        return []
+@dp.message_handler(lambda m: m.text == ADMIN_UNLOCK_CODE) async def admin_unlock_code_handler(message: types.Message): if message.from_user.id in ADMINS: admin_unlocked_users.add(message.from_user.id) await message.reply("✅ Admin mode enabled. Full features unlocked.") else: await message.reply("⛔ You're not allowed to use this code.")
 
-app = Application.builder().token(TOKEN).build()
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CallbackQueryHandler(handle_menu))
-app.add_handler(CallbackQueryHandler(next_image, pattern="^next$"))
-app.add_handler(CallbackQueryHandler(add_favorite, pattern="^fav$"))
-app.add_handler(CallbackQueryHandler(start, pattern="^menu$"))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, receive_character))
+--- RANDOM TAG FETCH ---
 
-if __name__ == "__main__":
-    print("💎 Super NSFW Bot running...")
-    app.run_polling()
+@dp.callback_query_handler(lambda c: c.data == "random_menu") async def random_menu_callback(callback_query: types.CallbackQuery): keyboard = InlineKeyboardMarkup(row_width=2) for tag in ["milf", "futanari", "bondage", "elf", "schoolgirl", "maid"]: keyboard.insert(InlineKeyboardButton(tag, callback_data=f"tag_{tag}")) await bot.send_message(callback_query.from_user.id, "🎲 Pick a tag to fetch a random image:", reply_markup=keyboard)
+
+@dp.callback_query_handler(lambda c: c.data.startswith("tag_")) async def tag_callback(callback_query: types.CallbackQuery): tag = callback_query.data.split("_")[1] images = fetch_images(tag, limit=1) if images: await bot.send_photo(chat_id=callback_query.from_user.id, photo=images[0]) else: await bot.send_message(callback_query.from_user.id, "No results found for that tag.")
+
+--- DAILY WAIFU DROP (For Premium Users) ---
+
+@dp.message_handler(commands=['mywaifu']) async def waifu_cmd(message: types.Message): uid = message.from_user.id waifu = user_preferences.get(uid) if not waifu: await message.reply("❌ No waifu set. Use /setwaifu [name] to save one.") return limit = 5 if uid in premium_users or uid in admin_unlocked_users else 2 images = fetch_images(waifu, limit=limit) if images: for img in images: await bot.send_photo(message.chat.id, img) else: await message.reply("No images found for your waifu today.")
+
+@dp.message_handler(commands=['setwaifu']) async def set_waifu_cmd(message: types.Message): if len(message.text.split()) < 2: await message.reply("Usage: /setwaifu [character_name]") return name = '_'.join(message.text.split()[1:]) user_preferences[message.from_user.id] = name await message.reply(f"💖 Your waifu has been set to {name}! Use /mywaifu anytime.", parse_mode="Markdown")
+
+--- RUN ---
+
+if name == 'main': executor.start_polling(dp, skip_updates=True)
+
