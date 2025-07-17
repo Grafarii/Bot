@@ -60,7 +60,7 @@ async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not hist:
             await query.edit_message_text("🕓 No search history found.")
         else:
-            await query.edit_message_text(f"🧠 Your recent searches:
+            await query.edit_message_text("🧠 Your recent searches:
 - " + "\n- ".join(hist[-5:]))
     elif query.data == "about":
         await query.edit_message_text(
