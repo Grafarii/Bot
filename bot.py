@@ -33,7 +33,7 @@ MAIN_MENU = InlineKeyboardMarkup([
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "💎 Welcome to the Ultimate NSFW Bot!\nOnly the best-rated Rule34 content.\n\nChoose an option below:",
-print("Only the best-rated Rule34 content.")
+        "Only the best-rated Rule34 content."
 
         "Choose an option below:",
         reply_markup=MAIN_MENU
