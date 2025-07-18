@@ -12,12 +12,13 @@ intents = nextcord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# === DeviantArt Best NSFW Images ===
+# === DeviantArt Image Fetcher ===
 async def fetch_deviantart_best_images(tag, limit=10):
     try:
+        query = tag.replace(" ", "+")
         url = (
-            f"https://www.deviantart.com/api/v1/oauth2/browse/popular?"
-            f"tag={tag}&limit={limit}&access_token={DA_TOKEN}&mature_content=true"
+            f"https://www.deviantart.com/api/v1/oauth2/browse/newest"
+            f"?q={query}&limit={limit}&access_token={DA_TOKEN}&mature_content=true"
         )
         r = requests.get(url, timeout=10)
         if r.ok:
@@ -33,7 +34,7 @@ async def fetch_deviantart_best_images(tag, limit=10):
         print(f"[DEBUG] DeviantArt fetch error: {e}")
     return []
 
-# === Button View ===
+# === View With Button ===
 class ImageView(View):
     def __init__(self, tag, images, user_id):
         super().__init__(timeout=60)
@@ -53,10 +54,10 @@ class ImageView(View):
         await interaction.response.edit_message(content=self.images[self.index], view=self)
 
 # === Slash Command ===
-@bot.slash_command(name="nsfw", description="Get best NSFW DeviantArt images by tag")
+@bot.slash_command(name="nsfw", description="Get NSFW DeviantArt images by tag or character name")
 async def nsfw(
     interaction: Interaction,
-    tag: str = SlashOption(name="tag", description="Enter a tag like 'futa', 'maid', 'elf'", required=True)
+    tag: str = SlashOption(name="tag", description="Enter a tag or character name", required=True)
 ):
     await interaction.response.defer()
     images = await fetch_deviantart_best_images(tag)
@@ -64,10 +65,10 @@ async def nsfw(
         view = ImageView(tag, images, interaction.user.id)
         await interaction.followup.send(content=images[0], view=view)
     else:
-        await interaction.followup.send("❌ No images found on DeviantArt for that tag.")
+        await interaction.followup.send("❌ No images found for that tag on DeviantArt.")
 
 @bot.event
 async def on_ready():
-    print(f"✅ DeviantArt Bot is online as {bot.user} (ID: {bot.user.id})")
+    print(f"✅ Bot is online as {bot.user} (ID: {bot.user.id})")
 
 bot.run(TOKEN)
