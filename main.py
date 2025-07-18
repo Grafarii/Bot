@@ -1,10 +1,9 @@
-# main.py – Discord Bot with Slash Commands (NSFW Fetcher)
+# main.py – Fixed Discord Bot with Slash Commands and NSFW Channel Check
 import os
 import requests
 import nextcord
 from nextcord.ext import commands
-from nextcord import Interaction
-from nextcord import SlashOption
+from nextcord import Interaction, SlashOption
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 
@@ -12,6 +11,7 @@ intents = nextcord.Intents.default()
 intents.message_content = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# Fetch from APIs
 async def fetch_from_danbooru(tags, limit=1):
     url = f"https://danbooru.donmai.us/posts.json?tags={tags}+rating:explicit&limit={limit}"
     r = requests.get(url)
@@ -34,16 +34,14 @@ async def fetch_images(tag, limit=1):
         await fetch_from_rule34(tag, limit)
     )
 
-@bot.event
-async def on_ready():
-    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
-
+# Slash command
 @bot.slash_command(name="nsfw", description="Search NSFW images by tag", guild_ids=[])
 async def nsfw(
     interaction: Interaction,
-    tag: str = SlashOption(name="tag", description="Search term (e.g., elf, futa, maid)", required=True)
+    tag: str = SlashOption(name="tag", description="Search term (e.g. elf, futa, maid)", required=True)
 ):
-    if not interaction.channel.is_nsfw():
+    channel = await bot.fetch_channel(interaction.channel_id)
+    if not channel.is_nsfw():
         await interaction.response.send_message("⚠️ This command only works in NSFW-marked channels.", ephemeral=True)
         return
 
@@ -54,5 +52,9 @@ async def nsfw(
             await interaction.followup.send(img)
     else:
         await interaction.followup.send("❌ No results found.")
+
+@bot.event
+async def on_ready():
+    print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
 
 bot.run(TOKEN)
